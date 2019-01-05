@@ -8,6 +8,7 @@ import ctypes
 import time
 import os
 
+filename = None
 # Enable multithreading?
 MULTITHREAD = True
 
@@ -84,6 +85,10 @@ def movename(move):
 def play_game(gamectrl):
     moveno = 0
     start = time.time()
+    
+    if filename :
+        f = open(filename,'w')
+       
     while 1:
         state = gamectrl.get_status()
         if state == 'ended':
@@ -95,11 +100,23 @@ def play_game(gamectrl):
         moveno += 1
         board = gamectrl.get_board()
         move = find_best_move(board)
+        
+       
+        
+        if filename:
+            print("save move");
+            f.write(str(move) + ',')
+            f.write(','.join([str(item) for sublist in board for item in sublist]))
+            f.write("\n")
+            
+            
+        
         if move < 0:
             break
         print("%010.6f: Score %d, Move %d: %s" % (time.time() - start, gamectrl.get_score(), moveno, movename(move)))
         gamectrl.execute_move(move)
-
+    
+    f.close()
     score = gamectrl.get_score()
     board = gamectrl.get_board()
     maxval = max(max(row) for row in to_val(board))
@@ -112,12 +129,19 @@ def parse_args(argv):
     parser.add_argument('-p', '--port', help="Port number to control on (default: 32000 for Firefox, 9222 for Chrome)", type=int)
     parser.add_argument('-b', '--browser', help="Browser you're using. Only Firefox with the Remote Control extension, and Chrome with remote debugging, are supported right now.", default='firefox', choices=('firefox', 'chrome'))
     parser.add_argument('-k', '--ctrlmode', help="Control mode to use. If the browser control doesn't seem to work, try changing this.", default='hybrid', choices=('keyboard', 'fast', 'hybrid'))
+    parser.add_argument('-f', '--movesfile', help="create a moves file.",type=str)
 
     return parser.parse_args(argv)
 
 def main(argv):
     args = parse_args(argv)
 
+    global filename
+    
+    if args.movesfile:
+        print("generate moves file")
+        filename = args.movesfile
+        
     if args.browser == 'firefox':
         from ffctrl import FirefoxRemoteControl
         if args.port is None:
@@ -138,7 +162,8 @@ def main(argv):
     elif args.ctrlmode == 'hybrid':
         from gamectrl import Hybrid2048Control
         gamectrl = Hybrid2048Control(ctrl)
-
+    
+    
     if gamectrl.get_status() == 'ended':
         gamectrl.restart_game()
 
@@ -146,4 +171,5 @@ def main(argv):
 
 if __name__ == '__main__':
     import sys
+    
     exit(main(sys.argv[1:]))
