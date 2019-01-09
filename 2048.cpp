@@ -250,12 +250,14 @@ static inline int get_max_rank(board_t board) {
 
 static inline int count_distinct_tiles(board_t board) {
     uint16_t bitset = 0;
+    //store all present tiles in board
+    // board having 2046,128,2 and 0s would be 0000010001000011(bin) 
     while (board) {
         bitset |= 1<<(board & 0xf);
         board >>= 4;
     }
 
-    // Don't count empty tiles.
+    // Don't count empty tiles, remove 0
     bitset >>= 1;
 
     int count = 0;
@@ -432,12 +434,14 @@ int ask_for_move(board_t board) {
     char *validpos = validstr;
 
     print_board(board);
-
+    
+    //fill valid str with all the possible moves
     for(move=0; move<4; move++) {
         if(execute_move(move, board) != board)
             *validpos++ = "UDLR"[move];
     }
-    *validpos = 0;
+    *validpos = 0; //end in 0
+    //there are no valid moves
     if(validpos == validstr)
         return -1;
 
@@ -446,47 +450,61 @@ int ask_for_move(board_t board) {
         const char *allmoves = "UDLR";
 
         printf("Move [%s]? ", validstr);
-
+        
+        //read from stdin until n char have been read or EOL, EOF
         if(!fgets(movestr, sizeof(movestr)-1, stdin))
             return -1;
-
+        
+        //read until is a valid move
         if(!strchr(validstr, toupper(movestr[0]))) {
             printf("Invalid move.\n");
             continue;
         }
-
+        //returns 0,1,2,3 instead UDLR
         return strchr(allmoves, toupper(movestr[0])) - allmoves;
     }
 }
 
-/* Playing the game */
+/* Playing the game 
+ returns a board with 1 tile 2,4
+ */
 static board_t draw_tile() {
     return (unif_random(10) < 9) ? 1 : 2;
 }
-
+/* board is current state and tile is a board with 1 tile */
 static board_t insert_tile_rand(board_t board, board_t tile) {
-    int index = unif_random(count_empty(board));
+    int index = unif_random(count_empty(board)); //index of the empty slot
     board_t tmp = board;
     while (true) {
+        /* check if the less significant nibble is 0
+         * by shifting right the board to search for the empty space and
+         * shiftin left the tile a tile board that fits in the board will result
+         */ 
         while ((tmp & 0xf) != 0) {
             tmp >>= 4;
             tile <<= 4;
         }
-        if (index == 0) break;
+        if (index == 0) break; //we have found the empty space
         --index;
-        tmp >>= 4;
+        //in case we have to keep looking, we move from the empty slot
+        tmp >>= 4; 
         tile <<= 4;
     }
-    return board | tile;
+    return board | tile; //return the board with the new tile
 }
 
 static board_t initial_board() {
+    // first tile is inserted randomly in the 1 of the 16 cells
     board_t board = draw_tile() << (4 * unif_random(16));
-    return insert_tile_rand(board, draw_tile());
+    // second tile is inserted randomly in one of the empty cells
+    return insert_tile_rand(board, draw_tile()); 
 }
 
 void play_game(get_move_func_t get_move) {
     board_t board = initial_board();
+    //custom board
+    //lowest weight nibble is the top left ordered 
+    //board = 0xFC43EA4298412130ULL;
     int moveno = 0;
     int scorepenalty = 0; // "penalty" for obtaining free 4 tiles
 
@@ -515,6 +533,7 @@ void play_game(get_move_func_t get_move) {
         }
 
         board_t tile = draw_tile();
+        //because the generation of a 4 tile won't be scored
         if (tile == 2) scorepenalty += 4;
         board = insert_tile_rand(newboard, tile);
     }
