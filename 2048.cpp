@@ -6,9 +6,12 @@
 #include <string.h>
 #include <time.h>
 #include <algorithm>
-
+#include <unistd.h>
+#include <iostream>
+#include <sstream>
 #include "2048.h"
 
+using namespace std;
 #include "config.h"
 #if defined(HAVE_UNORDERED_MAP)
     #include <unordered_map>
@@ -500,14 +503,15 @@ static board_t initial_board() {
     return insert_tile_rand(board, draw_tile()); 
 }
 
-void play_game(get_move_func_t get_move) {
-    board_t board = initial_board();
-    //custom board
-    //lowest weight nibble is the top left ordered 
-    //board = 0xFC43EA4298412130ULL;
+void play_game(get_move_func_t get_move,board_t board = 0) {
+    
     int moveno = 0;
     int scorepenalty = 0; // "penalty" for obtaining free 4 tiles
 
+    if(board == 0){
+        board = initial_board();
+    }
+    
     while(1) {
         int move;
         board_t newboard;
@@ -542,7 +546,31 @@ void play_game(get_move_func_t get_move) {
     printf("\nGame over. Your score is %.0f. The highest rank you achieved was %d.\n", score_board(board) - scorepenalty, get_max_rank(board));
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    
+    int opt;
+    board_t board = 0;
+    while ((opt = getopt (argc, argv, "b:")) != -1){
+        
+        if(opt == 'b'){
+            
+            //https://stackoverflow.com/a/21924263/2205297
+            stringstream board_ss;
+            board_ss << optarg;
+            //https://stackoverflow.com/a/11608960/2205297
+            board_ss >> hex >> board;
+            
+            if(board == 0){
+              cout << "error parsing board" << endl;  
+              return -1;
+            }
+            
+            cout << "Initial Board:" << hex << board << endl; 
+            print_board(board);
+        }
+                    
+    }
+    
     init_tables();
-    play_game(find_best_move);
+    play_game(find_best_move,board);
 }
