@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <iomanip>
 #include "2048.h"
 
 using namespace std;
@@ -503,11 +505,12 @@ static board_t initial_board() {
     return insert_tile_rand(board, draw_tile()); 
 }
 
-void play_game(get_move_func_t get_move,board_t board = 0) {
+void play_game(get_move_func_t get_move,board_t board, ofstream &outfile) {
     
     int moveno = 0;
     int scorepenalty = 0; // "penalty" for obtaining free 4 tiles
-
+    bool writefile = outfile.is_open();
+    
     if(board == 0){
         board = initial_board();
     }
@@ -536,6 +539,9 @@ void play_game(get_move_func_t get_move,board_t board = 0) {
             continue;
         }
 
+        if(writefile){
+            outfile << setfill('0') << setw(16) << hex << board << endl;
+        }
         board_t tile = draw_tile();
         //because the generation of a 4 tile won't be scored
         if (tile == 2) scorepenalty += 4;
@@ -544,13 +550,18 @@ void play_game(get_move_func_t get_move,board_t board = 0) {
 
     print_board(board);
     printf("\nGame over. Your score is %.0f. The highest rank you achieved was %d.\n", score_board(board) - scorepenalty, get_max_rank(board));
+    if(writefile){
+        outfile << flush;
+    }
 }
 
 int main(int argc, char *argv[]) {
     
     int opt;
     board_t board = 0;
-    while ((opt = getopt (argc, argv, "b:")) != -1){
+    ofstream outfile;
+    
+    while ((opt = getopt (argc, argv, "b:f:")) != -1){
         
         if(opt == 'b'){
             
@@ -567,10 +578,15 @@ int main(int argc, char *argv[]) {
             
             cout << "Initial Board:" << hex << board << endl; 
             print_board(board);
+        }else if(opt == 'f'){
+            
+            string filename = optarg;
+            outfile.open(filename);
+            
         }
                     
     }
     
     init_tables();
-    play_game(find_best_move,board);
+    play_game(find_best_move,board,outfile);
 }
