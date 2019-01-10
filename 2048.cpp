@@ -11,6 +11,7 @@
 #include <sstream>
 #include <fstream>
 #include <iomanip>
+#include <sys/stat.h>
 #include "2048.h"
 
 using namespace std;
@@ -406,8 +407,7 @@ float score_toplevel_move(board_t board, int move) {
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_usec - start.tv_usec) / 1000000.0;
 
-    printf("Move %d: result %f: eval'd %ld moves (%d cache hits, %d cache size) in %.2f seconds (maxdepth=%d)\n", move, res,
-        state.moves_evaled, state.cachehits, (int)state.trans_table.size(), elapsed, state.maxdepth);
+    //printf("Move %d: result %f: eval'd %ld moves (%d cache hits, %d cache size) in %.2f seconds (maxdepth=%d)\n", move, res,state.moves_evaled, state.cachehits, (int)state.trans_table.size(), elapsed, state.maxdepth);
 
     return res;
 }
@@ -418,8 +418,8 @@ int find_best_move(board_t board) {
     float best = 0;
     int bestmove = -1;
 
-    print_board(board);
-    printf("Current scores: heur %.0f, actual %.0f\n", score_heur_board(board), score_board(board));
+    //print_board(board);
+    //printf("Current scores: heur %.0f, actual %.0f\n", score_heur_board(board), score_board(board));
 
     for(move=0; move<4; move++) {
         float res = score_toplevel_move(board, move);
@@ -525,9 +525,11 @@ void play_game(get_move_func_t get_move,board_t board, ofstream &outfile) {
         }
         if(move == 4)
             break; // no legal moves
-
-        printf("\nMove #%d, current score=%.0f\n", ++moveno, score_board(board) - scorepenalty);
-
+        
+        //printf("\nMove #%d, current score=%.0f\n", ++moveno, score_board(board) - scorepenalty);
+        
+        moveno ++;
+        cout <<  "Move #" << moveno << " highest tile: " <<  (2 << ( get_max_rank(board) - 1 )) << " score: " << score_board(board) << endl;  
         move = get_move(board);
         if(move < 0)
             break;
@@ -555,6 +557,19 @@ void play_game(get_move_func_t get_move,board_t board, ofstream &outfile) {
     }
 }
 
+//parse a 16char long string into board_t
+board_t parseBoard(const string &stringboard){
+    
+    board_t board;
+     //https://stackoverflow.com/a/21924263/2205297
+    stringstream board_ss;
+    board_ss << stringboard;
+    //https://stackoverflow.com/a/11608960/2205297
+    board_ss >> hex >> board;
+    
+    return board;
+}
+
 int main(int argc, char *argv[]) {
     
     int opt;
@@ -565,11 +580,7 @@ int main(int argc, char *argv[]) {
         
         if(opt == 'b'){
             
-            //https://stackoverflow.com/a/21924263/2205297
-            stringstream board_ss;
-            board_ss << optarg;
-            //https://stackoverflow.com/a/11608960/2205297
-            board_ss >> hex >> board;
+            board = parseBoard(string(optarg));
             
             if(board == 0){
               cout << "error parsing board" << endl;  
@@ -577,12 +588,46 @@ int main(int argc, char *argv[]) {
             }
             
             cout << "Initial Board:" << hex << board << endl; 
+            cout << dec ;
             print_board(board);
         }else if(opt == 'f'){
             
             string filename = optarg;
-            outfile.open(filename);
+            struct stat buf;
             
+            if (stat(filename.c_str(), &buf) != -1){
+                //file exisits
+                //https://stackoverflow.com/a/25774093/2205297
+                ifstream fin;
+                fin.open(filename,ios::ate);
+                if(fin.is_open()){
+                
+                    char ch;
+                    fin.seekg(-1, ios::end);        // move to location 65 
+                    fin.get(ch);                         // get next char at loc 66
+                    if (ch == '\n')
+                    {
+                        fin.seekg(-2, ios::cur);    // move to loc 64 for get() to read loc 65 
+                        fin.seekg(-1, ios::cur);    // move to loc 63 to avoid reading loc 65
+                        fin.get(ch);                     // get the char at loc 64 ('5')
+                        while(ch != '\n')                   // read each char backward till the next '\n'
+                        {
+                            fin.seekg(-2, ios::cur);    
+                            fin.get(ch);
+                        }
+                        string lastLine;
+                        std::getline(fin,lastLine);
+                         board = parseBoard(lastLine);
+                        cout << "The last line : " << lastLine << endl;
+                        print_board(board);
+                        
+                        fin.close();
+                    }
+                }
+                outfile.open(filename,fstream::out | fstream::app);
+            }else{
+                outfile.open(filename);
+            }
         }
                     
     }
